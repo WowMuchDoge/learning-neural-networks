@@ -44,7 +44,7 @@ class Neuron:
 
         return sigmoid(self.weight * self.input.activate() + self.bias)
 
-    def calculate_gradient(self, gradient: list[tuple[float, float]], depth: int, expected: float) -> None:
+    def calculate_gradient(self, gradient: list[tuple[float, float]], depth: int, expected: float, cur_activation_influence: float) -> None:
         if self.is_input: # Indicates that this is an input neuron that has no activation or weights
             return
         elif depth == 0: # Indicates that this is the ouput neuron
@@ -52,26 +52,25 @@ class Neuron:
 
             print(f"Cost for output neuron is {means_squared_error(self.activate(), expected)}")
 
-            activation_influence = means_squared_error_prime(self.activate(), expected) 
-            z_influence = sigmoid_prime(self.weight * self.input.activate() + self.bias) * activation_influence
-            weight_influence = self.input.activate() * z_influence
+            input_activation = self.input.activate()
+            z = self.weight * input_activation + self.bias
 
-            # A tiny nudge in bias is going to change z_influence by that nudge to bias
-            bias_influence = z_influence
+            weight_influence = input_activation * sigmoid_prime(z) * means_squared_error_prime(sigmoid(z), expected)
+            bias_influence = sigmoid_prime(z) * means_squared_error_prime(sigmoid(z), expected)
 
             gradient.append((weight_influence, bias_influence))
-            self.input.calculate_gradient(gradient, depth + 1, expected)
+
+            self.input.calculate_gradient(gradient, depth + 1, expected, self.weight * sigmoid_prime(z) * means_squared_error_prime(sigmoid(z), expected))
         else:
-            # Gonna go the other direction here so it's a bit easier for me to understand 
-            weight_influence_z = self.input.activate()
-            z_influence_activation = sigmoid_prime(self.weight * self.input.activate()) * weight_influence_z
-            z_activation_influence_cost = gradient[-1][0] * z_influence_activation
+            input_activation = self.input.activate()
+            z = self.weight * input_activation + self.bias
 
-            bias_influence_activation = sigmoid_prime(self.weight * self.input.activate())
-            bias_influence_cost = bias_influence_activation * gradient[-1][1]
+            weight_influence = input_activation * sigmoid_prime(z) * cur_activation_influence
+            bias_influence = sigmoid_prime(z) * cur_activation_influence
 
-            gradient.append((z_activation_influence_cost, bias_influence_cost))
-            self.input.calculate_gradient(gradient, depth + 1, expected)
+            gradient.append((weight_influence, bias_influence))
+
+            self.input.calculate_gradient(gradient, depth + 1, expected, self.weight * sigmoid_prime(z) * cur_activation_influence)
 
     def back_propagate(self, gradient_vector: list[tuple[float, float]]) -> None:
         if self.is_input:
@@ -98,5 +97,5 @@ output_neuron.set_input_neuron(hidden_neuron)
 
 for _ in range(10):
     gradient = []
-    output_neuron.calculate_gradient(gradient, 0, 1.0)
+    output_neuron.calculate_gradient(gradient, 0, 1.0, 0.0)
     output_neuron.back_propagate(gradient)
